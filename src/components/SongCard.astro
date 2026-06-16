@@ -1,0 +1,34 @@
+---
+import type { Song } from "@/types/song";
+import { coverUrl, fmtTime, fmtDate } from "@/lib/song";
+
+interface Props {
+  song: Song;
+  watchBase: string; // "/watch" 또는 "/ko/watch"
+  searchBase: string; // "/search" 또는 "/ko/search"
+}
+const { song, watchBase, searchBase } = Astro.props;
+const dur = song.end > song.start ? song.end - song.start : 0;
+---
+
+<article class="card">
+  <a class="thumb" href={`${watchBase}?id=${encodeURIComponent(song.id)}`}>
+    <img
+      src={coverUrl(song, "mqdefault")}
+      alt={song.title}
+      loading="lazy"
+      onerror={`this.onerror=null;this.src='https://i.ytimg.com/vi/${song.videoId}/hqdefault.jpg'`}
+    />
+    {dur > 0 && <span class="ts">{fmtTime(dur)}</span>}
+    <div class="thumb-title">{song.title}</div>
+  </a>
+  <div class="body">
+    <p class="a">{song.artist}</p>
+    <div class="meta">
+      <span class="badge date">{fmtDate(song.broadcastAt)}</span>
+      {song.tags.slice(0, 3).map((tag) => (
+        <a class="badge tag" href={`${searchBase}?q=tag:${encodeURIComponent(tag)}`}>{tag}</a>
+      ))}
+    </div>
+  </div>
+</article>

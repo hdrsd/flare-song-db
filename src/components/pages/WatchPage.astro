@@ -1,0 +1,147 @@
+---
+import Layout from "@/components/Layout.astro";
+import { getLocale, useT } from "@/lib/i18n";
+
+const locale = getLocale(Astro.currentLocale);
+const t = useT(locale);
+const base = locale === "ko" ? "/ko" : "";
+---
+
+<Layout title={t("watch.title")} active="watch">
+  <h1>{t("watch.title")}</h1>
+
+  <div class="watch">
+    <div class="player-wrap">
+      <div class="player-frame"><div id="player"></div></div>
+      <div class="now" id="now">
+        <div class="nt" id="nowTitle">{t("watch.pick")}</div>
+        <div class="na" id="nowArtist"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="toolbar">
+        <label><input type="checkbox" id="songMode" checked /> {t("watch.songMode")}</label>
+        <span style="flex:1"></span>
+        <span id="qcount">{t("common.loading")}</span>
+      </div>
+      <div class="queue" id="queue"></div>
+      <div class="more-wrap"><button id="more" class="more-btn" hidden>{t("songs.more")}</button></div>
+    </div>
+  </div>
+
+  <div id="cfg" data-base={base} data-index={`${base}/songs-index.json`}
+    data-queue={t("watch.queue")} hidden></div>
+
+  <script>
+    import { thumbUrl, fmtTime, escapeHtml, type CompactSong } from "@/lib/songs.shared";
+
+    const PAGE = 100;
+    const cfg = document.getElementById("cfg")!;
+    const queueLabel = cfg.dataset.queue ?? "Queue";
+
+    const queueEl = document.getElementById("queue")!;
+    const qcount = document.getElementById("qcount")!;
+    const moreBtn = document.getElementById("more") as HTMLButtonElement;
+    const songModeEl = document.getElementById("songMode") as HTMLInputElement;
+    const nowTitle = document.getElementById("nowTitle")!;
+    const nowArtist = document.getElementById("nowArtist")!;
+
+    let queue: CompactSong[] = [];
+    let rendered = 0;
+    let player: any = null;
+    let current = -1;
+    let ticker: number | undefined;
+
+    function rowHtml(s: CompactSong, idx: number) {
+      const dur = s.e > s.st ? ` · ${fmtTime(s.e - s.st)}` : "";
+      return `<div class="qitem" data-idx="${idx}">
+        <img src="${thumbUrl(s.v, "mqdefault")}" alt="" loading="lazy"
+          onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${s.v}/hqdefault.jpg'" />
+        <div><div class="qt">${escapeHtml(s.t)}</div><div class="qa">${escapeHtml(s.a)}${dur}</div></div>
+      </div>`;
+    }
+
+    function renderUpTo(n: number) {
+      if (n <= rendered) return;
+      const end = Math.min(n, queue.length);
+      let html = "";
+      for (let i = rendered; i < end; i++) html += rowHtml(queue[i], i);
+      queueEl.insertAdjacentHTML("beforeend", html);
+      rendered = end;
+      moreBtn.hidden = rendered >= queue.length;
+    }
+
+    function highlight(i: number) {
+      queueEl.querySelectorAll(".qitem.active").forEach((el) => el.classList.remove("active"));
+      const el = queueEl.querySelector<HTMLElement>(`.qitem[data-idx="${i}"]`);
+      el?.classList.add("active");
+      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+
+    function play(i: number) {
+      if (i < 0 || i >= queue.length || !player) return;
+      current = i;
+      const s = queue[i];
+      nowTitle.textContent = s.t;
+      nowArtist.textContent = s.a;
+      renderUpTo(i + 1);
+      highlight(i);
+      const u = new URL(location.href);
+      u.searchParams.set("id", s.id);
+      history.replaceState(null, "", u);
+      player.loadVideoById({ videoId: s.v, startSeconds: s.st });
+    }
+
+    function next() { if (current + 1 < queue.length) play(current + 1); }
+
+    function startTicker() {
+      stopTicker();
+      ticker = window.setInterval(() => {
+        if (!player || current < 0) return;
+        const s = queue[current];
+        if (songModeEl.checked && s.e > s.st && (player.getCurrentTime?.() ?? 0) >= s.e) next();
+      }, 300);
+    }
+    function stopTicker() { if (ticker) clearInterval(ticker); ticker = undefined; }
+
+    // 클릭 위임
+    queueEl.addEventListener("click", (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>(".qitem");
+      if (el) play(Number(el.dataset.idx));
+    });
+    moreBtn.addEventListener("click", () => renderUpTo(rendered + PAGE));
+    window.addEventListener("beforeunload", stopTicker);
+
+    function initPlayer(initialId: string | null) {
+      (window as any).onYouTubeIframeAPIReady = () => {
+        player = new (window as any).YT.Player("player", {
+          width: "100%", height: "100%",
+          playerVars: { playsinline: 1, rel: 0 },
+          events: {
+            onReady: () => {
+              startTicker();
+              const idx = initialId ? queue.findIndex((q) => q.id === initialId) : -1;
+              if (idx >= 0) play(idx);
+            },
+            onStateChange: (e: any) => { if (e.data === 0) next(); },
+          },
+        });
+      };
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(tag);
+    }
+
+    const initialId = new URLSearchParams(location.search).get("id");
+    fetch(cfg.dataset.index!)
+      .then((r) => r.json())
+      .then((data: CompactSong[]) => {
+        queue = data;
+        qcount.textContent = `${queueLabel} (${queue.length})`;
+        renderUpTo(PAGE);
+        initPlayer(initialId);
+      })
+      .catch(() => (qcount.textContent = "데이터를 불러오지 못했습니다."));
+  </script>
+</Layout>

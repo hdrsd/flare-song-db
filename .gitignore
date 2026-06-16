@@ -1,0 +1,17 @@
+# build output
+dist/
+.astro/
+
+# deps
+node_modules/
+
+# secrets (자동화 워커용 — 절대 커밋 금지)
+.dev.vars
+.env
+.env.local
+*.pem
+*.key
+
+# os
+.DS_Store
+Thumbs.db

@@ -1,0 +1,5 @@
+# Cloudflare Pages (정적 사이트) 배포 설정.
+# 런타임 시크릿 없음 — YOUTUBE_API_KEY는 빌드/수집(로컬)에서만 사용, 사이트엔 포함되지 않음.
+name = "flare-song-db"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-06-01"

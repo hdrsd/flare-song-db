@@ -1,0 +1,101 @@
+---
+import Layout from "@/components/Layout.astro";
+import { getLocale, useT } from "@/lib/i18n";
+import { getSongsByDateDesc, localizeAll, collectTags } from "@/lib/song";
+
+const locale = getLocale(Astro.currentLocale);
+const t = useT(locale);
+const base = locale === "ko" ? "/ko" : "";
+// facet 태그는 서버에서 집계(데이터는 클라이언트로 전송 안 함)
+const facets = collectTags(localizeAll(getSongsByDateDesc(), locale)).slice(0, 16);
+---
+
+<Layout title={t("search.title")} active="search">
+  <h1>{t("search.title")}</h1>
+
+  <form id="searchForm" class="searchbar">
+    <input id="q" name="q" type="search" placeholder={t("search.placeholder")} autocomplete="off" />
+    <button type="submit">🔍</button>
+  </form>
+  <p class="hint">{t("search.hint")}</p>
+
+  <div class="facets">
+    <strong style="font-size:13px;color:var(--text-dim);align-self:center;">{t("search.tags")}:</strong>
+    {facets.map((f) => (
+      <a class="badge tag" href={`${base}/search?q=tag:${encodeURIComponent(f.tag)}`}>{f.tag} ({f.count})</a>
+    ))}
+  </div>
+
+  <p id="count" class="sub"></p>
+  <div id="results" class="grid"></div>
+  <div class="more-wrap"><button id="more" class="more-btn" hidden>{t("songs.more")}</button></div>
+  <p id="empty" class="empty" hidden>{t("search.empty")}</p>
+
+  <div id="cfg"
+    data-base={base}
+    data-index={`${base}/songs-index.json`}
+    data-results={t("search.results", { n: "%n%" })}
+    hidden></div>
+
+  <script>
+    import { renderCard, searchCompact, type CompactSong } from "@/lib/songs.shared";
+
+    const PAGE = 60;
+    const cfg = document.getElementById("cfg")!;
+    const base = cfg.dataset.base ?? "";
+    const resultsTpl = cfg.dataset.results ?? "%n%";
+    const watchBase = `${base}/watch`;
+    const searchBase = `${base}/search`;
+
+    const input = document.getElementById("q") as HTMLInputElement;
+    const form = document.getElementById("searchForm") as HTMLFormElement;
+    const results = document.getElementById("results")!;
+    const countEl = document.getElementById("count")!;
+    const emptyEl = document.getElementById("empty")!;
+    const moreBtn = document.getElementById("more") as HTMLButtonElement;
+
+    let all: CompactSong[] = [];
+    let filtered: CompactSong[] = [];
+    let shown = 0;
+
+    function renderMore() {
+      const slice = filtered.slice(shown, shown + PAGE);
+      results.insertAdjacentHTML("beforeend", slice.map((s) => renderCard(s, watchBase, searchBase)).join(""));
+      shown += slice.length;
+      moreBtn.hidden = shown >= filtered.length;
+    }
+
+    function run(q: string) {
+      filtered = q.trim() ? searchCompact(all, q) : all;
+      shown = 0;
+      results.innerHTML = "";
+      countEl.textContent = filtered.length ? resultsTpl.replace("%n%", String(filtered.length)) : "";
+      emptyEl.hidden = filtered.length !== 0;
+      renderMore();
+    }
+
+    moreBtn.addEventListener("click", renderMore);
+    form.addEventListener("submit", (e) => { e.preventDefault(); run(input.value); });
+
+    let timer: number;
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const u = new URL(location.href);
+        if (input.value) u.searchParams.set("q", input.value);
+        else u.searchParams.delete("q");
+        history.replaceState(null, "", u);
+        run(input.value);
+      }, 150);
+    });
+
+    const initial = new URLSearchParams(location.search).get("q") ?? "";
+    input.value = initial;
+    countEl.textContent = "…";
+
+    fetch(cfg.dataset.index!)
+      .then((r) => r.json())
+      .then((data: CompactSong[]) => { all = data; run(initial); })
+      .catch(() => (countEl.textContent = "데이터를 불러오지 못했습니다."));
+  </script>
+</Layout>

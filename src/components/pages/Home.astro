@@ -1,0 +1,26 @@
+---
+import Layout from "@/components/Layout.astro";
+import SongCard from "@/components/SongCard.astro";
+import { getLocale, useT } from "@/lib/i18n";
+import { getSongsByDateDesc, localizeAll } from "@/lib/song";
+
+const locale = getLocale(Astro.currentLocale);
+const t = useT(locale);
+const base = locale === "ko" ? "/ko" : "";
+const recent = localizeAll(getSongsByDateDesc(), locale).slice(0, 8);
+---
+
+<Layout active="home">
+  <h1>🔥 {t("site.name")}</h1>
+  <p class="sub">{t("site.tagline")}</p>
+
+  <div class="toolbar" style="justify-content: space-between;">
+    <strong>{t("home.recent")}</strong>
+    <a class="badge tag" href={`${base}/songs`}>{t("home.browse")} →</a>
+  </div>
+  <div class="grid">
+    {recent.map((song) => (
+      <SongCard song={song} watchBase={`${base}/watch`} searchBase={`${base}/search`} />
+    ))}
+  </div>
+</Layout>

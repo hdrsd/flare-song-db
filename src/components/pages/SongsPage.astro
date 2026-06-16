@@ -1,0 +1,131 @@
+---
+import Layout from "@/components/Layout.astro";
+import { getLocale, useT } from "@/lib/i18n";
+
+const locale = getLocale(Astro.currentLocale);
+const t = useT(locale);
+const base = locale === "ko" ? "/ko" : "";
+---
+
+<Layout title={t("songs.title")} active="songs">
+  <h1>{t("songs.title")}</h1>
+
+  <div class="filterbar">
+    <input id="quick" type="search" placeholder={t("filter.quick")} autocomplete="off" />
+    <select id="sort">
+      <option value="newest">{t("sort.newest")}</option>
+      <option value="oldest">{t("sort.oldest")}</option>
+      <option value="title">{t("sort.title")}</option>
+      <option value="duration">{t("sort.duration")}</option>
+    </select>
+  </div>
+
+  <div class="facet-row" id="years"><span class="lbl">{t("filter.year")}</span></div>
+  <div class="facet-row" id="tags"><span class="lbl">{t("filter.tag")}</span></div>
+
+  <p class="sub" id="count">{t("common.loading")}</p>
+  <div class="grid" id="grid"></div>
+  <div class="more-wrap"><button id="more" class="more-btn" hidden>{t("songs.more")}</button></div>
+
+  <div id="cfg"
+    data-base={base}
+    data-index={`${base}/songs-index.json`}
+    data-count={t("songs.count", { n: "%n%" })}
+    data-all={t("songs.all")}
+    hidden></div>
+
+  <script>
+    import { renderCard, searchCompact, type CompactSong } from "@/lib/songs.shared";
+
+    const PAGE = 60;
+    const cfg = document.getElementById("cfg")!;
+    const base = cfg.dataset.base ?? "";
+    const countTpl = cfg.dataset.count ?? "%n%";
+    const allLabel = cfg.dataset.all ?? "All";
+    const watchBase = `${base}/watch`;
+    const searchBase = `${base}/search`;
+
+    const grid = document.getElementById("grid")!;
+    const countEl = document.getElementById("count")!;
+    const yearsEl = document.getElementById("years")!;
+    const tagsEl = document.getElementById("tags")!;
+    const moreBtn = document.getElementById("more") as HTMLButtonElement;
+    const quick = document.getElementById("quick") as HTMLInputElement;
+    const sortEl = document.getElementById("sort") as HTMLSelectElement;
+
+    let all: CompactSong[] = [];
+    let filtered: CompactSong[] = [];
+    let shown = 0;
+    let year = "";
+    let tag = "";
+
+    const sorters: Record<string, (a: CompactSong, b: CompactSong) => number> = {
+      newest: (a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0),
+      oldest: (a, b) => (a.d > b.d ? 1 : a.d < b.d ? -1 : 0),
+      title: (a, b) => a.t.localeCompare(b.t, "ja"),
+      duration: (a, b) => b.e - b.st - (a.e - a.st),
+    };
+
+    function applyFilter() {
+      let list = all;
+      if (year) list = list.filter((s) => String(s.y) === year);
+      if (tag) list = list.filter((s) => s.g.includes(tag));
+      if (quick.value.trim()) list = searchCompact(list, quick.value);
+      filtered = [...list].sort(sorters[sortEl.value] ?? sorters.newest);
+      shown = 0;
+      grid.innerHTML = "";
+      countEl.textContent = countTpl.replace("%n%", String(filtered.length));
+      renderMore();
+    }
+
+    function renderMore() {
+      const slice = filtered.slice(shown, shown + PAGE);
+      grid.insertAdjacentHTML("beforeend", slice.map((s) => renderCard(s, watchBase, searchBase)).join(""));
+      shown += slice.length;
+      moreBtn.hidden = shown >= filtered.length;
+    }
+
+    function chip(container: HTMLElement, val: string, label: string, isActive: boolean) {
+      const a = document.createElement("a");
+      a.className = "badge chip" + (isActive ? " active" : "");
+      a.dataset.val = val;
+      a.textContent = label;
+      container.appendChild(a);
+      return a;
+    }
+
+    function buildChips(container: HTMLElement, values: string[], get: () => string, set: (v: string) => void) {
+      chip(container, "", allLabel, get() === "");
+      for (const v of values) chip(container, v, v, false);
+      container.addEventListener("click", (e) => {
+        const el = (e.target as HTMLElement).closest<HTMLElement>(".chip");
+        if (!el) return;
+        set(el.dataset.val ?? "");
+        container.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c === el));
+        applyFilter();
+      });
+    }
+
+    moreBtn.addEventListener("click", renderMore);
+    sortEl.addEventListener("change", applyFilter);
+    let timer: number;
+    quick.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(applyFilter, 150);
+    });
+
+    fetch(cfg.dataset.index!)
+      .then((r) => r.json())
+      .then((data: CompactSong[]) => {
+        all = data;
+        const years = [...new Set(all.map((s) => s.y))].sort((a, b) => b - a).map(String);
+        const tagCount = new Map<string, number>();
+        for (const s of all) for (const g of s.g) tagCount.set(g, (tagCount.get(g) ?? 0) + 1);
+        const tags = [...tagCount.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+        buildChips(yearsEl, years, () => year, (v) => (year = v));
+        buildChips(tagsEl, tags, () => tag, (v) => (tag = v));
+        applyFilter();
+      })
+      .catch(() => (countEl.textContent = "데이터를 불러오지 못했습니다."));
+  </script>
+</Layout>

@@ -1,0 +1,60 @@
+---
+import "@/styles/global.css";
+import { getLocale, useT } from "@/lib/i18n";
+
+interface Props {
+  title?: string;
+  active?: "home" | "songs" | "search" | "watch";
+}
+const { title, active } = Astro.props;
+const locale = getLocale(Astro.currentLocale);
+const t = useT(locale);
+
+// 로케일 토글: ko는 /ko 접두사, ja는 접두사 없음(astro.config defaultLocale=ja)
+const path = Astro.url.pathname.replace(/^\/ko/, "") || "/";
+const jaHref = path;
+const koHref = "/ko" + (path === "/" ? "" : path);
+
+const nav = [
+  { key: "home", href: locale === "ko" ? "/ko" : "/", label: t("nav.home") },
+  { key: "songs", href: (locale === "ko" ? "/ko" : "") + "/songs", label: t("nav.songs") },
+  { key: "search", href: (locale === "ko" ? "/ko" : "") + "/search", label: t("nav.search") },
+  { key: "watch", href: (locale === "ko" ? "/ko" : "") + "/watch", label: t("nav.watch") },
+];
+const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={t("site.tagline")} />
+    <link rel="icon" href="/favicon.svg" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="inner">
+        <a class="brand" href={locale === "ko" ? "/ko" : "/"}>🔥 {t("site.name")}</a>
+        <nav class="nav">
+          {nav.map((n) => (
+            <a href={n.href} class={active === n.key ? "active" : ""}>{n.label}</a>
+          ))}
+        </nav>
+        <div class="lang">
+          <a href={jaHref} class={locale === "ja" ? "active" : ""}>JA</a>
+          <a href={koHref} class={locale === "ko" ? "active" : ""}>KO</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">{t("disclaimer")}</div>
+    </footer>
+  </body>
+</html>

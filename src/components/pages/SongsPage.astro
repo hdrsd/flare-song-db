@@ -18,6 +18,7 @@ const base = locale === "ko" ? "/ko" : "";
       <option value="title">{t("sort.title")}</option>
       <option value="duration">{t("sort.duration")}</option>
     </select>
+    <label class="acap-toggle"><input type="checkbox" id="hideAcap" /> {t("filter.hideAcapella")}</label>
   </div>
 
   <div class="facet-row" id="years"><span class="lbl">{t("filter.year")}</span></div>
@@ -54,6 +55,8 @@ const base = locale === "ko" ? "/ko" : "";
     const moreBtn = document.getElementById("more") as HTMLButtonElement;
     const quick = document.getElementById("quick") as HTMLInputElement;
     const sortEl = document.getElementById("sort") as HTMLSelectElement;
+    const hideAcap = document.getElementById("hideAcap") as HTMLInputElement;
+    try { hideAcap.checked = (localStorage.getItem("flare:hideAcap") ?? "1") === "1"; } catch { hideAcap.checked = true; }
 
     let all: CompactSong[] = [];
     let filtered: CompactSong[] = [];
@@ -70,6 +73,7 @@ const base = locale === "ko" ? "/ko" : "";
 
     function applyFilter() {
       let list = all;
+      if (hideAcap.checked) list = list.filter((s) => !s.g.includes("아카펠라"));
       if (year) list = list.filter((s) => String(s.y) === year);
       if (tag) list = list.filter((s) => s.g.includes(tag));
       if (quick.value.trim()) list = searchCompact(list, quick.value);
@@ -110,6 +114,10 @@ const base = locale === "ko" ? "/ko" : "";
 
     moreBtn.addEventListener("click", renderMore);
     sortEl.addEventListener("change", applyFilter);
+    hideAcap.addEventListener("change", () => {
+      try { localStorage.setItem("flare:hideAcap", hideAcap.checked ? "1" : "0"); } catch {}
+      applyFilter();
+    });
     let timer: number;
     quick.addEventListener("input", () => {
       clearTimeout(timer);

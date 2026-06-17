@@ -64,8 +64,9 @@ const labels = {
 
     fetch(cfg.dataset.index!)
       .then((r) => r.json())
-      .then((all: CompactSong[]) => {
+      .then((raw: CompactSong[]) => {
         const has = (s: CompactSong, tag: string) => s.g.includes(tag);
+        const all = raw.filter((s) => !has(s, "아카펠라")); // 아카펠라(흥얼거림) 통계 제외
         const uta = all.filter((s) => has(s, "歌枠"));
 
         // 요약 카드

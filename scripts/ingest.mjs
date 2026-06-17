@@ -95,7 +95,7 @@ function buildSongs(video, broadcastAt, parsed) {
         end: p.end,
         broadcastAt,
         year,
-        tags: ["歌枠"],
+        tags: /アカペラ|あかぺら|ｱｶﾍﾟﾗ|acappella|a\s*cappella/i.test(`${p.title} ${p.artist}`) ? ["歌枠", "아카펠라"] : ["歌枠"],
         milestones: [],
       };
     });

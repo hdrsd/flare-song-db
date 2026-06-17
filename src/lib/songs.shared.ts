@@ -43,6 +43,7 @@ const TAG_LABELS: Record<string, { ja: string; ko: string }> = {
   "콜라보": { ja: "コラボ", ko: "콜라보" },
   "유닛": { ja: "ユニット", ko: "유닛" },
   "홀로전체곡": { ja: "ホロライブ全体曲", ko: "홀로 전체곡" },
+  "아카펠라": { ja: "アカペラ", ko: "아카펠라" },
 };
 
 export function tagLabel(tag: string, locale: "ja" | "ko"): string {

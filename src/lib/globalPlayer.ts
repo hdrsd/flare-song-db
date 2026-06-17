@@ -87,7 +87,12 @@ class FlarePlayer {
     if (this.ticker) return;
     this.ticker = window.setInterval(() => {
       if (!this.yt || !this.song) return;
-      if (this.songMode && this.song.e > this.song.st && (this.yt.getCurrentTime?.() ?? 0) >= this.song.e) this.next();
+      if (!this.songMode || this.song.e <= this.song.st) return;
+      const t = this.yt.getCurrentTime?.() ?? 0;
+      const d = this.yt.getDuration?.() ?? 0;
+      // 광고 중에는 getCurrentTime/getDuration이 '광고' 기준(길이가 짧음)이라,
+      // 영상 전체 길이가 곡의 end 이상일 때만 자동 넘김 → 광고 중 오넘김 방지
+      if (d >= this.song.e && t >= this.song.e) this.next();
     }, 400);
   }
 

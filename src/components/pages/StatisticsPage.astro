@@ -39,6 +39,7 @@ const labels = {
   <script>
     import { tagLabel, escapeHtml, type CompactSong } from "@/lib/songs.shared";
 
+    function setup() {
     const cfg = document.getElementById("cfg")!;
     const base = cfg.dataset.base ?? "";
     const locale = base === "/ko" ? "ko" : "ja";
@@ -100,5 +101,7 @@ const labels = {
         );
       })
       .catch(() => (document.getElementById("cards")!.textContent = L.loadFail));
+    }
+    document.addEventListener("astro:page-load", setup);
   </script>
 </Layout>

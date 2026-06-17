@@ -1,5 +1,7 @@
 ---
 import "@/styles/global.css";
+import { ClientRouter } from "astro:transitions";
+import GlobalPlayer from "@/components/GlobalPlayer.astro";
 import { getLocale, useT } from "@/lib/i18n";
 
 interface Props {
@@ -35,15 +37,23 @@ const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
     <title>{fullTitle}</title>
     <meta name="description" content={t("site.tagline")} />
     <link rel="icon" href="/favicon.svg" />
+    <meta name="theme-color" id="metaThemeColor" content="#0f1014" />
+    <ClientRouter />
     <script is:inline>
-      // 무플래시: 렌더 전에 테마 적용
-      try {
-        const tm = localStorage.getItem("flare:theme");
-        if (tm === "light" || tm === "dark") document.documentElement.dataset.theme = tm;
-      } catch (e) {}
+      // 무플래시: 저장값 또는 시스템 설정으로 테마 결정
+      (function () {
+        try {
+          var saved = localStorage.getItem("flare:theme");
+          var sysLight = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches;
+          var theme = saved === "light" || saved === "dark" ? saved : sysLight ? "light" : "dark";
+          document.documentElement.dataset.theme = theme;
+          var m = document.getElementById("metaThemeColor");
+          if (m) m.setAttribute("content", theme === "light" ? "#f6f7f9" : "#0f1014");
+        } catch (e) {}
+      })();
     </script>
   </head>
-  <body>
+  <body data-page={active}>
     <header class="site-header">
       <div class="inner">
         <a class="brand" href={locale === "ko" ? "/ko" : "/"}>🔥 {t("site.name")}</a>
@@ -75,6 +85,8 @@ const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
         btn.addEventListener("click", () => {
           const next = cur() === "light" ? "dark" : "light";
           document.documentElement.dataset.theme = next;
+          const m = document.getElementById("metaThemeColor");
+          if (m) m.setAttribute("content", next === "light" ? "#f6f7f9" : "#0f1014");
           try { localStorage.setItem("flare:theme", next); } catch (e) {}
           sync();
         });
@@ -89,13 +101,15 @@ const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
       <div class="container">{t("disclaimer")}</div>
     </footer>
 
+    <GlobalPlayer />
+
     <button id="toTop" class="to-top" aria-label="Top" hidden>↑</button>
     <script is:inline>
       (() => {
         const b = document.getElementById("toTop");
         if (!b) return;
         const upd = () => { b.hidden = window.scrollY < 400; };
-        addEventListener("scroll", upd, { passive: true });
+        window.onscroll = upd; // SPA 이동 시 중복 방지(단일 핸들러)
         b.addEventListener("click", () => scrollTo({ top: 0, behavior: "smooth" }));
         upd();
       })();

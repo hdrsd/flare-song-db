@@ -36,6 +36,7 @@ const cats = [
   <script>
     import { renderCard, type CompactSong } from "@/lib/songs.shared";
 
+    function setup() {
     const PAGE = 60;
     const cfg = document.getElementById("cfg")!;
     const base = cfg.dataset.base ?? "";
@@ -91,5 +92,7 @@ const cats = [
         apply();
       })
       .catch(() => (countEl.textContent = "데이터를 불러오지 못했습니다."));
+    }
+    document.addEventListener("astro:page-load", setup);
   </script>
 </Layout>

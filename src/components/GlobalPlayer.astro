@@ -1,0 +1,45 @@
+---
+import { getLocale } from "@/lib/i18n";
+const locale = getLocale(Astro.currentLocale);
+const base = locale === "ko" ? "/ko" : "";
+---
+
+<div id="gp" class="gp" data-state="idle" data-video="off" transition:persist="gp">
+  <div class="gp-video"><div id="gp-yt"></div></div>
+  <a class="gp-meta" id="gp-expand" href={`${base}/watch`}>
+    <div id="gp-title" class="gp-title"></div>
+    <div id="gp-artist" class="gp-artist"></div>
+  </a>
+  <div class="gp-ctrls">
+    <button id="gp-prev" aria-label="Prev">⏮</button>
+    <button id="gp-pp" aria-label="Play/Pause">▶</button>
+    <button id="gp-next" aria-label="Next">⏭</button>
+    <button id="gp-fav" aria-label="Favorite">♡</button>
+    <button id="gp-vid" aria-label="Video">📺</button>
+    <button id="gp-close" aria-label="Close">✕</button>
+  </div>
+</div>
+
+<script>
+  import { getPlayer } from "@/lib/globalPlayer";
+  const p = getPlayer();
+  function wire() {
+    const b = (id: string, fn: () => void) => { const el = document.getElementById(id); if (el) (el as HTMLElement).onclick = fn; };
+    b("gp-pp", () => p.toggle());
+    b("gp-prev", () => p.prev());
+    b("gp-next", () => p.next());
+    b("gp-fav", () => p.toggleFav());
+    b("gp-close", () => { try { p.yt?.pauseVideo?.(); } catch {} const g = document.getElementById("gp"); if (g) g.dataset.state = "idle"; });
+    // 영상 표시 토글 (기본 숨김 = 오디오만, iframe은 화면 밖 유지)
+    const gpEl = document.getElementById("gp");
+    const vb = document.getElementById("gp-vid");
+    const setVid = (m: string) => { if (gpEl) gpEl.dataset.video = m; if (vb) vb.classList.toggle("on", m === "on"); };
+    let vmode = "off";
+    try { if (localStorage.getItem("flare:video") === "on") vmode = "on"; } catch {}
+    setVid(vmode);
+    if (vb) vb.onclick = () => { const m = gpEl?.dataset.video === "on" ? "off" : "on"; try { localStorage.setItem("flare:video", m); } catch {} setVid(m); };
+    p.renderBar();
+  }
+  wire();
+  document.addEventListener("astro:page-load", wire);
+</script>

@@ -41,6 +41,7 @@ const facets = collectTags(localizeAll(getSongsByDateDesc(), locale)).slice(0, 1
   <script>
     import { renderCard, searchCompact, type CompactSong } from "@/lib/songs.shared";
 
+    function setup() {
     const PAGE = 60;
     const cfg = document.getElementById("cfg")!;
     const base = cfg.dataset.base ?? "";
@@ -99,5 +100,7 @@ const facets = collectTags(localizeAll(getSongsByDateDesc(), locale)).slice(0, 1
       .then((r) => r.json())
       .then((data: CompactSong[]) => { all = data; run(initial); })
       .catch(() => (countEl.textContent = "데이터를 불러오지 못했습니다."));
+    }
+    document.addEventListener("astro:page-load", setup);
   </script>
 </Layout>

@@ -39,6 +39,7 @@ const labels = {
     import { loadPlaylists, deletePlaylist, removeFromPlaylist, createPlaylist, encodeShare, decodeShare } from "@/lib/playlists";
     import { loadFavorites, toggleFavorite } from "@/lib/favorites";
 
+    function setup() {
     const cfg = document.getElementById("cfg")!;
     const base = cfg.dataset.base ?? "";
     const L = JSON.parse(cfg.dataset.labels!) as Record<string, string>;
@@ -156,5 +157,7 @@ const labels = {
         renderList();
       })
       .catch(() => (listEl.innerHTML = `<p class="empty">${L.loadFail}</p>`));
+    }
+    document.addEventListener("astro:page-load", setup);
   </script>
 </Layout>

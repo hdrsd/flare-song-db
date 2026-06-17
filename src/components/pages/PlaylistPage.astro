@@ -1,0 +1,160 @@
+---
+import Layout from "@/components/Layout.astro";
+import { getLocale, useT } from "@/lib/i18n";
+
+const locale = getLocale(Astro.currentLocale);
+const t = useT(locale);
+const base = locale === "ko" ? "/ko" : "";
+
+const labels = {
+  favorites: t("playlist.favorites"),
+  empty: t("playlist.empty"),
+  play: t("playlist.play"),
+  shuffle: t("playlist.shuffle"),
+  share: t("playlist.share"),
+  del: t("playlist.delete"),
+  remove: t("playlist.remove"),
+  count: t("playlist.count", { n: "%n%" }),
+  received: t("playlist.received"),
+  save: t("playlist.save"),
+  saved: t("playlist.saved"),
+  copied: t("playlist.copied"),
+  loadFail: locale === "ko" ? "데이터를 불러오지 못했습니다." : "データを読み込めませんでした。",
+};
+---
+
+<Layout title={t("playlist.title")} active="playlist">
+  <h1>{t("playlist.title")}</h1>
+  <p class="sub">{t("playlist.subtitle")}</p>
+
+  <div id="received" hidden></div>
+  <div id="favCard"></div>
+  <div id="list"></div>
+
+  <div id="cfg" data-base={base} data-index={`${base}/songs-index.json`}
+    data-labels={JSON.stringify(labels)} hidden></div>
+
+  <script>
+    import { thumbUrl, fmtTime, escapeHtml, type CompactSong } from "@/lib/songs.shared";
+    import { loadPlaylists, deletePlaylist, removeFromPlaylist, createPlaylist, encodeShare, decodeShare } from "@/lib/playlists";
+    import { loadFavorites, toggleFavorite } from "@/lib/favorites";
+
+    const cfg = document.getElementById("cfg")!;
+    const base = cfg.dataset.base ?? "";
+    const L = JSON.parse(cfg.dataset.labels!) as Record<string, string>;
+    const watchBase = `${base}/watch`, plBase = `${base}/playlist`;
+    const listEl = document.getElementById("list")!;
+    const favCardEl = document.getElementById("favCard")!;
+    const receivedEl = document.getElementById("received")!;
+    const byId = new Map<string, CompactSong>();
+
+    const songLink = (id: string) => `${watchBase}?id=${encodeURIComponent(id)}`;
+    const songMain = (s: CompactSong) => `
+      <a href="${songLink(s.id)}" class="pl-song-main">
+        <img src="${thumbUrl(s.v)}" alt="" loading="lazy"
+          onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${s.v}/hqdefault.jpg'" />
+        <div><div class="pl-song-t">${escapeHtml(s.t)}</div><div class="pl-song-a">${escapeHtml(s.a)}${s.e>s.st?` · ${fmtTime(s.e-s.st)}`:""}</div></div>
+      </a>`;
+    const rowMini = (s: CompactSong, plId?: string) =>
+      `<div class="pl-song">${songMain(s)}${plId ? `<button class="pl-song-x" data-pl="${plId}" data-sid="${s.id}" title="${L.remove}">✕</button>` : ""}</div>`;
+    const favRow = (s: CompactSong) =>
+      `<div class="pl-song">${songMain(s)}<button class="pl-song-x" data-sid="${s.id}" title="${L.remove}">✕</button></div>`;
+
+    function renderFavorites() {
+      const favIds = loadFavorites();
+      if (favIds.length === 0) { favCardEl.innerHTML = ""; return; }
+      const songs = favIds.map((id) => byId.get(id)).filter(Boolean) as CompactSong[];
+      favCardEl.innerHTML = `<section class="pl-card fav">
+        <div class="pl-card-head">
+          <div><strong class="pl-name">♥ ${escapeHtml(L.favorites)}</strong>
+            <span class="pl-card-count">${L.count.replace("%n%", String(favIds.length))}</span></div>
+          <div class="pl-card-actions">
+            <a class="np-btn primary" href="${watchBase}?fav=1">▶ ${L.play}</a>
+            <a class="np-btn" href="${watchBase}?fav=1&shuffle=1">🔀 ${L.shuffle}</a>
+          </div>
+        </div>
+        <div class="pl-songs">${songs.map((s) => favRow(s)).join("")}</div>
+      </section>`;
+    }
+    favCardEl.addEventListener("click", (e) => {
+      const x = (e.target as HTMLElement).closest<HTMLElement>(".pl-song-x");
+      if (x) { e.preventDefault(); toggleFavorite(x.dataset.sid!); renderFavorites(); }
+    });
+
+    function renderList() {
+      const pls = loadPlaylists();
+      if (pls.length === 0) { listEl.innerHTML = `<p class="empty">${escapeHtml(L.empty)}</p>`; return; }
+      listEl.innerHTML = pls.map((p) => {
+        const songs = p.songIds.map((id) => byId.get(id)).filter(Boolean) as CompactSong[];
+        return `<section class="pl-card" data-pl="${p.id}">
+          <div class="pl-card-head">
+            <div><strong class="pl-name">${escapeHtml(p.name)}</strong>
+              <span class="pl-card-count">${L.count.replace("%n%", String(p.songIds.length))}</span></div>
+            <div class="pl-card-actions">
+              <a class="np-btn primary" href="${watchBase}?list=${p.id}">▶ ${L.play}</a>
+              <a class="np-btn" href="${watchBase}?list=${p.id}&shuffle=1">🔀 ${L.shuffle}</a>
+              <button class="np-btn" data-act="share" data-pl="${p.id}">🔗 ${L.share}</button>
+              <button class="np-btn" data-act="del" data-pl="${p.id}">🗑 ${L.del}</button>
+            </div>
+          </div>
+          <div class="pl-songs">${songs.map((s) => rowMini(s, p.id)).join("") || `<p class="empty">—</p>`}</div>
+        </section>`;
+      }).join("");
+    }
+
+    // 액션 위임
+    listEl.addEventListener("click", (e) => {
+      const t = e.target as HTMLElement;
+      const actBtn = t.closest<HTMLElement>("[data-act]");
+      if (actBtn) {
+        const plId = actBtn.dataset.pl!;
+        const pls = loadPlaylists(); const pl = pls.find((p) => p.id === plId); if (!pl) return;
+        if (actBtn.dataset.act === "del") {
+          if (confirm(`"${pl.name}" ${L.del}?`)) { deletePlaylist(plId); renderList(); }
+        } else if (actBtn.dataset.act === "share") {
+          const url = `${location.origin}${plBase}?share=${encodeShare(pl.name, pl.songIds)}`;
+          navigator.clipboard?.writeText(url).then(() => { actBtn.textContent = `✓ ${L.copied}`; setTimeout(() => renderList(), 1200); },
+            () => prompt("URL", url));
+        }
+        return;
+      }
+      const x = t.closest<HTMLElement>(".pl-song-x");
+      if (x) { e.preventDefault(); removeFromPlaylist(x.dataset.pl!, x.dataset.sid!); renderList(); }
+    });
+
+    // 받은 공유 플레이리스트
+    function renderReceived(name: string, ids: string[]) {
+      const songs = ids.map((id) => byId.get(id)).filter(Boolean) as CompactSong[];
+      const enc = encodeShare(name, ids);
+      receivedEl.hidden = false;
+      receivedEl.innerHTML = `<section class="pl-card received">
+        <div class="pl-card-head">
+          <div><strong class="pl-name">📥 ${escapeHtml(name)}</strong>
+            <span class="pl-card-count">${L.count.replace("%n%", String(ids.length))} · ${L.received}</span></div>
+          <div class="pl-card-actions">
+            <a class="np-btn primary" href="${watchBase}?share=${enc}">▶ ${L.play}</a>
+            <button class="np-btn" id="saveReceived">💾 ${L.save}</button>
+          </div>
+        </div>
+        <div class="pl-songs">${songs.map((s) => rowMini(s)).join("")}</div>
+      </section>`;
+      document.getElementById("saveReceived")!.addEventListener("click", () => {
+        createPlaylist(name, ids);
+        receivedEl.innerHTML = `<p class="empty">✓ ${L.saved}</p>`;
+        renderList();
+        history.replaceState(null, "", plBase);
+      });
+    }
+
+    fetch(cfg.dataset.index!)
+      .then((r) => r.json())
+      .then((data: CompactSong[]) => {
+        for (const s of data as CompactSong[]) byId.set(s.id, s);
+        const share = new URLSearchParams(location.search).get("share");
+        if (share) { const d = decodeShare(share); if (d) renderReceived(d.name, d.songIds.filter((id) => byId.has(id))); }
+        renderFavorites();
+        renderList();
+      })
+      .catch(() => (listEl.innerHTML = `<p class="empty">${L.loadFail}</p>`));
+  </script>
+</Layout>

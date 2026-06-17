@@ -1,0 +1,90 @@
+---
+import Layout from "@/components/Layout.astro";
+import { getLocale, useT } from "@/lib/i18n";
+
+const locale = getLocale(Astro.currentLocale);
+const t = useT(locale);
+const base = locale === "ko" ? "/ko" : "";
+
+// 탭: 라벨(로케일) → 필터 태그(데이터의 실제 태그 문자열)
+const cats = [
+  { key: "originals", label: t("disco.originals"), tag: "오리지널" },
+  { key: "covers", label: t("disco.covers"), tag: "커버" },
+  { key: "collabs", label: t("disco.collabs"), tag: "콜라보" },
+  { key: "units", label: t("disco.units"), tag: "유닛" },
+  { key: "holo", label: t("disco.holo"), tag: "홀로전체곡" },
+];
+---
+
+<Layout title={t("disco.title")} active="discography">
+  <h1>{t("disco.title")}</h1>
+
+  <div class="facet-row" id="tabs">
+    {cats.map((c, i) => (
+      <a class={`badge chip${i === 0 ? " active" : ""}`} data-cat={c.key} data-tag={c.tag}>{c.label}</a>
+    ))}
+  </div>
+
+  <p class="sub" id="count">{t("common.loading")}</p>
+  <div class="grid" id="grid"></div>
+  <div class="more-wrap"><button id="more" class="more-btn" hidden>{t("songs.more")}</button></div>
+
+  <div id="cfg" data-base={base} data-index={`${base}/songs-index.json`}
+    data-count={t("songs.count", { n: "%n%" })} hidden></div>
+
+  <script>
+    import { renderCard, type CompactSong } from "@/lib/songs.shared";
+
+    const PAGE = 60;
+    const cfg = document.getElementById("cfg")!;
+    const base = cfg.dataset.base ?? "";
+    const countTpl = cfg.dataset.count ?? "%n%";
+    const watchBase = `${base}/watch`, searchBase = `${base}/search`;
+
+    const grid = document.getElementById("grid")!;
+    const countEl = document.getElementById("count")!;
+    const tabsEl = document.getElementById("tabs")!;
+    const moreBtn = document.getElementById("more") as HTMLButtonElement;
+
+    let all: CompactSong[] = [];
+    let filtered: CompactSong[] = [];
+    let shown = 0;
+    let tag = "오리지널";
+
+    function apply() {
+      filtered = all.filter((s) => s.g.includes(tag));
+      shown = 0; grid.innerHTML = "";
+      countEl.textContent = countTpl.replace("%n%", String(filtered.length));
+      more();
+    }
+    function more() {
+      const slice = filtered.slice(shown, shown + PAGE);
+      grid.insertAdjacentHTML("beforeend", slice.map((s) => renderCard(s, watchBase, searchBase)).join(""));
+      shown += slice.length;
+      moreBtn.hidden = shown >= filtered.length;
+    }
+    moreBtn.addEventListener("click", more);
+    tabsEl.addEventListener("click", (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>(".chip");
+      if (!el) return;
+      tag = el.dataset.tag!;
+      tabsEl.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c === el));
+      const u = new URL(location.href); u.searchParams.set("cat", el.dataset.cat!); history.replaceState(null, "", u);
+      apply();
+    });
+
+    fetch(cfg.dataset.index!)
+      .then((r) => r.json())
+      .then((data: CompactSong[]) => {
+        all = data;
+        const cat = new URLSearchParams(location.search).get("cat");
+        const el = cat ? tabsEl.querySelector<HTMLElement>(`.chip[data-cat="${cat}"]`) : null;
+        if (el) {
+          tag = el.dataset.tag!;
+          tabsEl.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c === el));
+        }
+        apply();
+      })
+      .catch(() => (countEl.textContent = "데이터를 불러오지 못했습니다."));
+  </script>
+</Layout>

@@ -5,63 +5,124 @@ import { getLocale, useT } from "@/lib/i18n";
 const locale = getLocale(Astro.currentLocale);
 const t = useT(locale);
 const base = locale === "ko" ? "/ko" : "";
+
+const labels = {
+  queue: t("watch.queue"),
+  thisVideo: t("watch.thisVideo"),
+  openYoutube: t("watch.openYoutube"),
+  add: t("watch.addToPlaylist"),
+  added: t("watch.added"),
+  playingList: t("watch.playingList"),
+  plays: t("watch.plays", { n: "%n%" }),
+  repeat: t("watch.repeat"),
+  repeatAll: t("watch.repeatAll"),
+  repeatOne: t("watch.repeatOne"),
+  favorites: t("playlist.favorites"),
+  newPl: t("playlist.new"),
+  name: t("playlist.name"),
+  create: t("playlist.create"),
+  save: t("playlist.save"),
+  saved: t("playlist.saved"),
+  close: t("common.close"),
+  loadFail: locale === "ko" ? "데이터를 불러오지 못했습니다." : "データを読み込めませんでした。",
+};
 ---
 
 <Layout title={t("watch.title")} active="watch">
   <h1>{t("watch.title")}</h1>
 
+  <div id="shareBanner" class="share-banner" hidden></div>
+
   <div class="watch">
     <div class="player-wrap">
       <div class="player-frame"><div id="player"></div></div>
+
       <div class="now" id="now">
         <div class="nt" id="nowTitle">{t("watch.pick")}</div>
         <div class="na" id="nowArtist"></div>
+        <div class="nmeta" id="nowMeta"></div>
+        <div class="nactions" id="nowActions" hidden>
+          <button id="favBtn" class="np-btn" title={t("watch.favorite")}>♡</button>
+          <a id="ytLink" class="np-btn" target="_blank" rel="noopener">▶ {labels.openYoutube}</a>
+          <button id="addBtn" class="np-btn">＋ {labels.add}</button>
+        </div>
+      </div>
+
+      <div class="segments" id="segBox" hidden>
+        <div class="seg-head">{labels.thisVideo} <span id="segCount"></span></div>
+        <div class="seg-list" id="segList"></div>
       </div>
     </div>
 
     <div>
       <div class="toolbar">
         <label><input type="checkbox" id="songMode" checked /> {t("watch.songMode")}</label>
+        <button id="shuffleBtn" class="np-btn">🔀 {t("watch.shuffle")}</button>
+        <button id="repeatBtn" class="np-btn" title={t("watch.repeat")}>🔁</button>
         <span style="flex:1"></span>
-        <span id="qcount">{t("common.loading")}</span>
+        <span id="qcount">…</span>
       </div>
       <div class="queue" id="queue"></div>
       <div class="more-wrap"><button id="more" class="more-btn" hidden>{t("songs.more")}</button></div>
     </div>
   </div>
 
+  <!-- 플레이리스트에 추가 모달 -->
+  <div id="plModal" class="modal-overlay" hidden>
+    <div class="modal">
+      <div class="modal-head"><strong id="plModalTitle">{labels.add}</strong>
+        <button id="plClose" class="x">✕</button></div>
+      <div id="plList" class="modal-list"></div>
+      <div class="modal-new">
+        <input id="plNewName" type="text" placeholder={labels.name} />
+        <button id="plCreate" class="np-btn primary">{labels.create}</button>
+      </div>
+    </div>
+  </div>
+
   <div id="cfg" data-base={base} data-index={`${base}/songs-index.json`}
-    data-queue={t("watch.queue")} hidden></div>
+    data-labels={JSON.stringify(labels)} hidden></div>
 
   <script>
-    import { thumbUrl, fmtTime, escapeHtml, type CompactSong } from "@/lib/songs.shared";
+    import { thumbUrl, fmtTime, fmtDate, escapeHtml, type CompactSong } from "@/lib/songs.shared";
+    import { loadPlaylists, createPlaylist, addToPlaylist, isInPlaylist, getPlaylist, decodeShare } from "@/lib/playlists";
+    import { isFavorite, toggleFavorite, loadFavorites } from "@/lib/favorites";
+    import { bumpCount, getCount } from "@/lib/playcounts";
 
     const PAGE = 100;
     const cfg = document.getElementById("cfg")!;
-    const queueLabel = cfg.dataset.queue ?? "Queue";
+    const base = cfg.dataset.base ?? "";
+    const L = JSON.parse(cfg.dataset.labels!) as Record<string, string>;
+    const searchBase = `${base}/search`;
 
-    const queueEl = document.getElementById("queue")!;
-    const qcount = document.getElementById("qcount")!;
-    const moreBtn = document.getElementById("more") as HTMLButtonElement;
-    const songModeEl = document.getElementById("songMode") as HTMLInputElement;
-    const nowTitle = document.getElementById("nowTitle")!;
-    const nowArtist = document.getElementById("nowArtist")!;
+    const $ = (id: string) => document.getElementById(id)!;
+    const queueEl = $("queue"), qcount = $("qcount"), moreBtn = $("more") as HTMLButtonElement;
+    const songModeEl = $("songMode") as HTMLInputElement, shuffleBtn = $("shuffleBtn") as HTMLButtonElement;
+    const nowTitle = $("nowTitle"), nowArtist = $("nowArtist"), nowMeta = $("nowMeta"), nowActions = $("nowActions");
+    const ytLink = $("ytLink") as HTMLAnchorElement, addBtn = $("addBtn");
+    const favBtn = $("favBtn"), repeatBtn = $("repeatBtn");
+    const segBox = $("segBox"), segList = $("segList"), segCount = $("segCount");
+    const shareBanner = $("shareBanner");
 
+    let all: CompactSong[] = [];
+    const byId = new Map<string, CompactSong>();
+    const videoIndex = new Map<string, CompactSong[]>();
     let queue: CompactSong[] = [];
-    let rendered = 0;
-    let player: any = null;
-    let current = -1;
-    let ticker: number | undefined;
+    let rendered = 0, curIdx = -1;
+    let curSong: CompactSong | null = null;
+    let player: any = null, loadedVid = "", ticker: number | undefined;
+    let shuffleOn = false;
+    let repeatMode = 0; // 0 off · 1 전체반복 · 2 한곡반복
 
+    // ── 큐 렌더 ──
     function rowHtml(s: CompactSong, idx: number) {
       const dur = s.e > s.st ? ` · ${fmtTime(s.e - s.st)}` : "";
       return `<div class="qitem" data-idx="${idx}">
-        <img src="${thumbUrl(s.v, "mqdefault")}" alt="" loading="lazy"
+        <img src="${thumbUrl(s.v)}" alt="" loading="lazy"
           onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${s.v}/hqdefault.jpg'" />
         <div><div class="qt">${escapeHtml(s.t)}</div><div class="qa">${escapeHtml(s.a)}${dur}</div></div>
       </div>`;
     }
-
     function renderUpTo(n: number) {
       if (n <= rendered) return;
       const end = Math.min(n, queue.length);
@@ -71,48 +132,163 @@ const base = locale === "ko" ? "/ko" : "";
       rendered = end;
       moreBtn.hidden = rendered >= queue.length;
     }
-
-    function highlight(i: number) {
+    function highlightQueue() {
       queueEl.querySelectorAll(".qitem.active").forEach((el) => el.classList.remove("active"));
-      const el = queueEl.querySelector<HTMLElement>(`.qitem[data-idx="${i}"]`);
-      el?.classList.add("active");
-      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      if (curIdx >= 0) {
+        const el = queueEl.querySelector<HTMLElement>(`.qitem[data-idx="${curIdx}"]`);
+        el?.classList.add("active");
+        el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
     }
 
-    function play(i: number) {
-      if (i < 0 || i >= queue.length || !player) return;
-      current = i;
-      const s = queue[i];
+    // ── now-playing 메타데이터 ──
+    function renderNow(s: CompactSong) {
       nowTitle.textContent = s.t;
       nowArtist.textContent = s.a;
-      renderUpTo(i + 1);
-      highlight(i);
-      const u = new URL(location.href);
-      u.searchParams.set("id", s.id);
-      history.replaceState(null, "", u);
-      player.loadVideoById({ videoId: s.v, startSeconds: s.st });
+      const tags = s.g.map((tag) =>
+        `<a class="badge tag" href="${searchBase}?q=tag:${encodeURIComponent(tag)}">${escapeHtml(tag)}</a>`).join("");
+      const sing = s.s && s.s !== s.a ? `<span class="np-sing">🎤 ${escapeHtml(s.s)}</span>` : "";
+      const n = getCount(s.id);
+      const plays = n > 0 ? `<span class="np-plays">▶ ${L.plays.replace("%n%", String(n))}</span>` : "";
+      nowMeta.innerHTML = `<span class="badge date">${fmtDate(s.d)}</span>${plays}${sing}${tags}`;
+      ytLink.href = `https://www.youtube.com/watch?v=${s.v}&t=${s.st}s`;
+      const fav = isFavorite(s.id);
+      favBtn.textContent = fav ? "♥" : "♡";
+      favBtn.classList.toggle("active", fav);
+      nowActions.hidden = false;
     }
 
-    function next() { if (current + 1 < queue.length) play(current + 1); }
+    // ── 이 방송의 곡(구간) 목록 ──
+    function renderSegments(s: CompactSong) {
+      const segs = videoIndex.get(s.v) ?? [];
+      if (segs.length <= 1) { segBox.hidden = true; return; }
+      segBox.hidden = false;
+      segCount.textContent = `(${segs.length})`;
+      segList.innerHTML = segs.map((seg) =>
+        `<div class="seg${seg.id === s.id ? " active" : ""}" data-sid="${seg.id}">
+          <span class="seg-ts">${fmtTime(seg.st)}</span>
+          <span class="seg-t">${escapeHtml(seg.t)}</span>
+        </div>`).join("");
+    }
 
+    // ── 재생 ──
+    function playSong(s: CompactSong, idx: number) {
+      curSong = s; curIdx = idx;
+      bumpCount(s.id);
+      renderNow(s); renderSegments(s); highlightQueue();
+      const u = new URL(location.href); u.searchParams.set("id", s.id); history.replaceState(null, "", u);
+      if (player) {
+        if (loadedVid === s.v) { player.seekTo(s.st, true); player.playVideo(); }
+        else { loadedVid = s.v; player.loadVideoById({ videoId: s.v, startSeconds: s.st }); }
+      }
+    }
+    function playQueue(i: number) { if (i >= 0 && i < queue.length) { renderUpTo(i + 1); playSong(queue[i], i); } }
+    function next() {
+      if (repeatMode === 2 && curSong) { playSong(curSong, curIdx); return; } // 한 곡 반복
+      if (shuffleOn && queue.length > 1) {
+        let r = curIdx; while (r === curIdx) r = Math.floor(Math.random() * queue.length);
+        playQueue(r); return;
+      }
+      if (curIdx >= 0 && curIdx + 1 < queue.length) { playQueue(curIdx + 1); return; }
+      if (curIdx >= 0 && repeatMode === 1 && queue.length > 0) { playQueue(0); return; } // 전체 반복(처음으로)
+      // 큐 밖(구간 클릭)이거나 큐 끝 → 같은 영상 다음 구간
+      if (curSong) {
+        const segs = videoIndex.get(curSong.v) ?? [];
+        const j = segs.findIndex((x) => x.id === curSong!.id);
+        if (j >= 0 && j + 1 < segs.length) {
+          const ns = segs[j + 1];
+          playSong(ns, queue.findIndex((x) => x.id === ns.id));
+        }
+      }
+    }
     function startTicker() {
       stopTicker();
       ticker = window.setInterval(() => {
-        if (!player || current < 0) return;
-        const s = queue[current];
-        if (songModeEl.checked && s.e > s.st && (player.getCurrentTime?.() ?? 0) >= s.e) next();
+        if (!player || !curSong) return;
+        if (songModeEl.checked && curSong.e > curSong.st && (player.getCurrentTime?.() ?? 0) >= curSong.e) next();
       }, 300);
     }
     function stopTicker() { if (ticker) clearInterval(ticker); ticker = undefined; }
 
-    // 클릭 위임
+    // ── 이벤트 위임 ──
     queueEl.addEventListener("click", (e) => {
       const el = (e.target as HTMLElement).closest<HTMLElement>(".qitem");
-      if (el) play(Number(el.dataset.idx));
+      if (el) playQueue(Number(el.dataset.idx));
+    });
+    segList.addEventListener("click", (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>(".seg");
+      if (!el) return;
+      const sid = el.dataset.sid!;
+      const s = byId.get(sid); if (!s) return;
+      playSong(s, queue.findIndex((x) => x.id === sid));
     });
     moreBtn.addEventListener("click", () => renderUpTo(rendered + PAGE));
+    shuffleBtn.addEventListener("click", () => {
+      shuffleOn = !shuffleOn;
+      shuffleBtn.classList.toggle("active", shuffleOn);
+    });
+    function updateRepeatBtn() {
+      repeatBtn.classList.toggle("active", repeatMode > 0);
+      repeatBtn.textContent = repeatMode === 2 ? "🔂" : "🔁";
+      repeatBtn.title = repeatMode === 1 ? L.repeatAll : repeatMode === 2 ? L.repeatOne : L.repeat;
+    }
+    repeatBtn.addEventListener("click", () => { repeatMode = (repeatMode + 1) % 3; updateRepeatBtn(); });
+    favBtn.addEventListener("click", () => {
+      if (!curSong) return;
+      const on = toggleFavorite(curSong.id);
+      favBtn.textContent = on ? "♥" : "♡";
+      favBtn.classList.toggle("active", on);
+    });
     window.addEventListener("beforeunload", stopTicker);
 
+    // ── 플레이리스트 추가 모달 ──
+    const plModal = $("plModal"), plList = $("plList"), plNewName = $("plNewName") as HTMLInputElement;
+    function openAddModal() {
+      if (!curSong) return;
+      renderModalList();
+      plModal.hidden = false; plNewName.value = "";
+    }
+    function renderModalList() {
+      const pls = loadPlaylists();
+      plList.innerHTML = pls.length
+        ? pls.map((p) => {
+            const inIt = curSong && isInPlaylist(p.id, curSong.id);
+            return `<button class="pl-row${inIt ? " in" : ""}" data-pid="${p.id}">
+              <span>${escapeHtml(p.name)}</span>
+              <span class="pl-row-r">${inIt ? "✓ " + L.added : "＋"} <small>${p.songIds.length}</small></span>
+            </button>`;
+          }).join("")
+        : `<p class="modal-empty">${escapeHtml(L.newPl)} ↓</p>`;
+    }
+    plList.addEventListener("click", (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>(".pl-row");
+      if (!el || !curSong) return;
+      addToPlaylist(el.dataset.pid!, curSong.id);
+      renderModalList();
+    });
+    $("plCreate").addEventListener("click", () => {
+      if (!curSong) return;
+      const name = plNewName.value.trim(); if (!name) { plNewName.focus(); return; }
+      createPlaylist(name, [curSong.id]);
+      plNewName.value = ""; renderModalList();
+    });
+    addBtn.addEventListener("click", openAddModal);
+    $("plClose").addEventListener("click", () => (plModal.hidden = true));
+    plModal.addEventListener("click", (e) => { if (e.target === plModal) plModal.hidden = true; });
+
+    // ── 공유 배너 (받은 플레이리스트 저장) ──
+    function showShareBanner(name: string, ids: string[]) {
+      shareBanner.hidden = false;
+      shareBanner.innerHTML =
+        `<span>📥 ${L.playingList}: <strong>${escapeHtml(name)}</strong> (${ids.length})</span>
+         <button id="saveShared" class="np-btn primary">${L.save}</button>`;
+      $("saveShared").addEventListener("click", () => {
+        createPlaylist(name, ids);
+        shareBanner.innerHTML = `<span>✓ ${L.saved}: <strong>${escapeHtml(name)}</strong></span>`;
+      });
+    }
+
+    // ── 초기화 ──
     function initPlayer(initialId: string | null) {
       (window as any).onYouTubeIframeAPIReady = () => {
         player = new (window as any).YT.Player("player", {
@@ -122,7 +298,8 @@ const base = locale === "ko" ? "/ko" : "";
             onReady: () => {
               startTicker();
               const idx = initialId ? queue.findIndex((q) => q.id === initialId) : -1;
-              if (idx >= 0) play(idx);
+              if (idx >= 0) playQueue(idx);
+              else if (initialId && byId.has(initialId)) playSong(byId.get(initialId)!, -1);
             },
             onStateChange: (e: any) => { if (e.data === 0) next(); },
           },
@@ -133,15 +310,42 @@ const base = locale === "ko" ? "/ko" : "";
       document.head.appendChild(tag);
     }
 
-    const initialId = new URLSearchParams(location.search).get("id");
+    const params = new URLSearchParams(location.search);
+    const initialId = params.get("id");
+    const listId = params.get("list");
+    const shareParam = params.get("share");
+    if (params.get("shuffle") === "1") { shuffleOn = true; shuffleBtn.classList.add("active"); }
+
     fetch(cfg.dataset.index!)
       .then((r) => r.json())
       .then((data: CompactSong[]) => {
-        queue = data;
-        qcount.textContent = `${queueLabel} (${queue.length})`;
+        all = data;
+        for (const s of all) {
+          byId.set(s.id, s);
+          if (!videoIndex.has(s.v)) videoIndex.set(s.v, []);
+          videoIndex.get(s.v)!.push(s);
+        }
+        for (const segs of videoIndex.values()) segs.sort((a, b) => a.st - b.st);
+
+        // 큐 소스 결정: ?fav= / ?list= / ?share= / 전체
+        if (params.get("fav") === "1") {
+          queue = loadFavorites().map((id) => byId.get(id)).filter(Boolean) as CompactSong[];
+        } else if (listId) {
+          const pl = getPlaylist(listId);
+          queue = (pl?.songIds ?? []).map((id) => byId.get(id)).filter(Boolean) as CompactSong[];
+        } else if (shareParam) {
+          const dec = decodeShare(shareParam);
+          if (dec) {
+            queue = dec.songIds.map((id) => byId.get(id)).filter(Boolean) as CompactSong[];
+            showShareBanner(dec.name, dec.songIds.filter((id) => byId.has(id)));
+          }
+        }
+        if (queue.length === 0) queue = all;
+
+        qcount.textContent = `${L.queue} (${queue.length})`;
         renderUpTo(PAGE);
         initPlayer(initialId);
       })
-      .catch(() => (qcount.textContent = "데이터를 불러오지 못했습니다."));
+      .catch(() => (qcount.textContent = L.loadFail));
   </script>
 </Layout>

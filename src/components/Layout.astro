@@ -4,7 +4,7 @@ import { getLocale, useT } from "@/lib/i18n";
 
 interface Props {
   title?: string;
-  active?: "home" | "songs" | "search" | "watch";
+  active?: "home" | "songs" | "search" | "watch" | "playlist" | "discography";
 }
 const { title, active } = Astro.props;
 const locale = getLocale(Astro.currentLocale);
@@ -18,8 +18,10 @@ const koHref = "/ko" + (path === "/" ? "" : path);
 const nav = [
   { key: "home", href: locale === "ko" ? "/ko" : "/", label: t("nav.home") },
   { key: "songs", href: (locale === "ko" ? "/ko" : "") + "/songs", label: t("nav.songs") },
+  { key: "discography", href: (locale === "ko" ? "/ko" : "") + "/discography", label: t("nav.discography") },
   { key: "search", href: (locale === "ko" ? "/ko" : "") + "/search", label: t("nav.search") },
   { key: "watch", href: (locale === "ko" ? "/ko" : "") + "/watch", label: t("nav.watch") },
+  { key: "playlist", href: (locale === "ko" ? "/ko" : "") + "/playlist", label: t("nav.playlist") },
 ];
 const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
 ---
@@ -56,5 +58,17 @@ const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
     <footer class="site-footer">
       <div class="container">{t("disclaimer")}</div>
     </footer>
+
+    <button id="toTop" class="to-top" aria-label="Top" hidden>↑</button>
+    <script is:inline>
+      (() => {
+        const b = document.getElementById("toTop");
+        if (!b) return;
+        const upd = () => { b.hidden = window.scrollY < 400; };
+        addEventListener("scroll", upd, { passive: true });
+        b.addEventListener("click", () => scrollTo({ top: 0, behavior: "smooth" }));
+        upd();
+      })();
+    </script>
   </body>
 </html>

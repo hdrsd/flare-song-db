@@ -20,7 +20,7 @@ const DRY = args.includes("--dry");
 
 const COVER_RE = /\bcover\b|歌ってみた|カバー|covered/i;
 const EXCLUDE_RE = /歌枠|踊ってみた|mmd|teaser|ティザー|試聴|メイキング|making|trailer|3d\s*live|宣伝|cm/i;
-const UNIT_RE = /フレアイリス|不知火建設|ノエフレ/i;
+const UNIT_RE = /フレアイリス|不知火建設|ノエフレ|白銀ノエル.*不知火フレア|不知火フレア.*白銀ノエル/i;
 const FLARE = "不知火フレア";
 
 function strip(x) {
@@ -29,6 +29,7 @@ function strip(x) {
     .replace(/[\(（]\s*cover.*$/i, "")
     .replace(/covered\s*by.*$/i, "")
     .replace(/[\(（]\s*official.*$/i, "")
+    .replace(/\s+cover\s*$/i, "")
     .replace(/[\(（]\s*$/, "")
     .trim();
 }
@@ -41,10 +42,13 @@ function parseCover(raw) {
   if (m) { artist = m[1]; title = m[2]; sing = m[3]; }
   else {
     s = s.replace(/^[\[【][^\]】]*[\]】]\s*/, "");
-    const i = s.lastIndexOf("/");
-    if (i > 0) { title = s.slice(0, i); sing = s.slice(i + 1); } else title = s;
+    const parts = s.split(/[／/]/); // 반각/전각 슬래시
+    if (parts.length >= 2) { title = parts[0]; sing = parts.slice(1).join("/"); }
+    else title = s;
   }
   title = strip(title); artist = strip(artist); sing = strip(sing);
+  // 가수에 'フレア'가 없으면 원곡 아티스트로 간주(가수는 항상 후레아)
+  if (sing && !/フレア|flare/i.test(sing) && !artist) { artist = sing; sing = FLARE; }
   if (!sing) sing = FLARE;
   return { title, artist, sing };
 }

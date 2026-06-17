@@ -35,6 +35,13 @@ const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
     <title>{fullTitle}</title>
     <meta name="description" content={t("site.tagline")} />
     <link rel="icon" href="/favicon.svg" />
+    <script is:inline>
+      // 무플래시: 렌더 전에 테마 적용
+      try {
+        const tm = localStorage.getItem("flare:theme");
+        if (tm === "light" || tm === "dark") document.documentElement.dataset.theme = tm;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <header class="site-header">
@@ -49,8 +56,24 @@ const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
           <a href={jaHref} class={locale === "ja" ? "active" : ""}>JA</a>
           <a href={koHref} class={locale === "ko" ? "active" : ""}>KO</a>
         </div>
+        <button id="themeToggle" class="theme-toggle" aria-label="Theme">🌙</button>
       </div>
     </header>
+    <script is:inline>
+      (() => {
+        const btn = document.getElementById("themeToggle");
+        if (!btn) return;
+        const cur = () => document.documentElement.dataset.theme || "dark";
+        const sync = () => (btn.textContent = cur() === "light" ? "☀️" : "🌙");
+        sync();
+        btn.addEventListener("click", () => {
+          const next = cur() === "light" ? "dark" : "light";
+          document.documentElement.dataset.theme = next;
+          try { localStorage.setItem("flare:theme", next); } catch (e) {}
+          sync();
+        });
+      })();
+    </script>
 
     <main class="container">
       <slot />

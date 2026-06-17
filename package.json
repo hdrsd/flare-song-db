@@ -12,7 +12,8 @@
     "ingest": "node scripts/ingest.mjs",
     "ingest:originals": "node scripts/ingest-originals.mjs",
     "ingest:covers": "node scripts/ingest-covers.mjs",
-    "ingest:seed": "node scripts/ingest-seed.mjs"
+    "ingest:seed": "node scripts/ingest-seed.mjs",
+    "enrich:durations": "node scripts/enrich-durations.mjs"
   },
   "dependencies": {
     "astro": "^5.5.0"

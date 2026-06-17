@@ -37,7 +37,22 @@ const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
     <title>{fullTitle}</title>
     <meta name="description" content={t("site.tagline")} />
     <link rel="icon" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" id="metaThemeColor" content="#0f1014" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Flare DB" />
+    <script is:inline>
+      if ("serviceWorker" in navigator && !window.__swReg) {
+        window.__swReg = 1;
+        var reg = function () { navigator.serviceWorker.register("/sw.js").catch(function () {}); };
+        if (document.readyState === "complete") reg();
+        else addEventListener("load", reg);
+      }
+    </script>
     <ClientRouter />
     <script is:inline>
       // 무플래시 + SPA 전환 후 테마 유지(astro:after-swap 시 html 속성이 초기화되므로 재적용)

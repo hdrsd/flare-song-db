@@ -6,13 +6,14 @@ const locale = getLocale(Astro.currentLocale);
 const t = useT(locale);
 const base = locale === "ko" ? "/ko" : "";
 
-// 탭: 라벨(로케일) → 필터 태그(데이터의 실제 태그 문자열)
+// 탭: 라벨(로케일) → 포함 태그 / 제외 태그(not)
+// 커버는 "따로 올린 커버곡"만 — 우타와꾸(歌枠) 노래방송 커버는 제외
 const cats = [
-  { key: "originals", label: t("disco.originals"), tag: "오리지널" },
-  { key: "covers", label: t("disco.covers"), tag: "커버" },
-  { key: "collabs", label: t("disco.collabs"), tag: "콜라보" },
-  { key: "units", label: t("disco.units"), tag: "유닛" },
-  { key: "holo", label: t("disco.holo"), tag: "홀로전체곡" },
+  { key: "originals", label: t("disco.originals"), tag: "오리지널", not: "" },
+  { key: "covers", label: t("disco.covers"), tag: "커버", not: "歌枠" },
+  { key: "collabs", label: t("disco.collabs"), tag: "콜라보", not: "" },
+  { key: "units", label: t("disco.units"), tag: "유닛", not: "" },
+  { key: "holo", label: t("disco.holo"), tag: "홀로전체곡", not: "" },
 ];
 ---
 
@@ -21,7 +22,7 @@ const cats = [
 
   <div class="facet-row" id="tabs">
     {cats.map((c, i) => (
-      <a class={`badge chip${i === 0 ? " active" : ""}`} data-cat={c.key} data-tag={c.tag}>{c.label}</a>
+      <a class={`badge chip${i === 0 ? " active" : ""}`} data-cat={c.key} data-tag={c.tag} data-not={c.not}>{c.label}</a>
     ))}
   </div>
 
@@ -50,9 +51,10 @@ const cats = [
     let filtered: CompactSong[] = [];
     let shown = 0;
     let tag = "오리지널";
+    let notTag = "";
 
     function apply() {
-      filtered = all.filter((s) => s.g.includes(tag));
+      filtered = all.filter((s) => s.g.includes(tag) && (!notTag || !s.g.includes(notTag)));
       shown = 0; grid.innerHTML = "";
       countEl.textContent = countTpl.replace("%n%", String(filtered.length));
       more();
@@ -68,6 +70,7 @@ const cats = [
       const el = (e.target as HTMLElement).closest<HTMLElement>(".chip");
       if (!el) return;
       tag = el.dataset.tag!;
+      notTag = el.dataset.not ?? "";
       tabsEl.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c === el));
       const u = new URL(location.href); u.searchParams.set("cat", el.dataset.cat!); history.replaceState(null, "", u);
       apply();
@@ -81,6 +84,7 @@ const cats = [
         const el = cat ? tabsEl.querySelector<HTMLElement>(`.chip[data-cat="${cat}"]`) : null;
         if (el) {
           tag = el.dataset.tag!;
+          notTag = el.dataset.not ?? "";
           tabsEl.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c === el));
         }
         apply();

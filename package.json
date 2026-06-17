@@ -11,6 +11,7 @@
     "deploy": "astro build && wrangler pages deploy",
     "ingest": "node scripts/ingest.mjs",
     "ingest:originals": "node scripts/ingest-originals.mjs",
+    "ingest:covers": "node scripts/ingest-covers.mjs",
     "ingest:seed": "node scripts/ingest-seed.mjs"
   },
   "dependencies": {

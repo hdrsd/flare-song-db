@@ -59,9 +59,8 @@ const labels = {
         <label><input type="checkbox" id="songMode" checked /> {t("watch.songMode")}</label>
         <button id="shuffleBtn" class="np-btn">🔀 {t("watch.shuffle")}</button>
         <button id="repeatBtn" class="np-btn" title={t("watch.repeat")}>🔁</button>
-        <span style="flex:1"></span>
-        <span id="qcount">…</span>
       </div>
+      <div class="qhead"><span id="qcount">…</span></div>
       <div class="queue" id="queue"></div>
       <div class="more-wrap"><button id="more" class="more-btn" hidden>{t("songs.more")}</button></div>
     </div>

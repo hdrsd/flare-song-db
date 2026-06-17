@@ -2,6 +2,7 @@
 import Layout from "@/components/Layout.astro";
 import { getLocale, useT } from "@/lib/i18n";
 import { getSongsByDateDesc, localizeAll, collectTags } from "@/lib/song";
+import { tagLabel } from "@/lib/songs.shared";
 
 const locale = getLocale(Astro.currentLocale);
 const t = useT(locale);
@@ -22,7 +23,7 @@ const facets = collectTags(localizeAll(getSongsByDateDesc(), locale)).slice(0, 1
   <div class="facets">
     <strong style="font-size:13px;color:var(--text-dim);align-self:center;">{t("search.tags")}:</strong>
     {facets.map((f) => (
-      <a class="badge tag" href={`${base}/search?q=tag:${encodeURIComponent(f.tag)}`}>{f.tag} ({f.count})</a>
+      <a class="badge tag" href={`${base}/search?q=tag:${encodeURIComponent(f.tag)}`}>{tagLabel(f.tag, locale)} ({f.count})</a>
     ))}
   </div>
 
@@ -43,6 +44,7 @@ const facets = collectTags(localizeAll(getSongsByDateDesc(), locale)).slice(0, 1
     const PAGE = 60;
     const cfg = document.getElementById("cfg")!;
     const base = cfg.dataset.base ?? "";
+    const locale = base === "/ko" ? "ko" : "ja";
     const resultsTpl = cfg.dataset.results ?? "%n%";
     const watchBase = `${base}/watch`;
     const searchBase = `${base}/search`;
@@ -60,7 +62,7 @@ const facets = collectTags(localizeAll(getSongsByDateDesc(), locale)).slice(0, 1
 
     function renderMore() {
       const slice = filtered.slice(shown, shown + PAGE);
-      results.insertAdjacentHTML("beforeend", slice.map((s) => renderCard(s, watchBase, searchBase)).join(""));
+      results.insertAdjacentHTML("beforeend", slice.map((s) => renderCard(s, watchBase, searchBase, locale)).join(""));
       shown += slice.length;
       moreBtn.hidden = shown >= filtered.length;
     }

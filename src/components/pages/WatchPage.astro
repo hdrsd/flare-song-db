@@ -83,7 +83,7 @@ const labels = {
     data-labels={JSON.stringify(labels)} hidden></div>
 
   <script>
-    import { thumbUrl, fmtTime, fmtDate, escapeHtml, type CompactSong } from "@/lib/songs.shared";
+    import { thumbUrl, fmtTime, fmtDate, escapeHtml, tagLabel, type CompactSong } from "@/lib/songs.shared";
     import { loadPlaylists, createPlaylist, addToPlaylist, isInPlaylist, getPlaylist, decodeShare } from "@/lib/playlists";
     import { isFavorite, toggleFavorite, loadFavorites } from "@/lib/favorites";
     import { bumpCount, getCount } from "@/lib/playcounts";
@@ -92,6 +92,7 @@ const labels = {
     const cfg = document.getElementById("cfg")!;
     const base = cfg.dataset.base ?? "";
     const L = JSON.parse(cfg.dataset.labels!) as Record<string, string>;
+    const locale = base === "/ko" ? "ko" : "ja";
     const searchBase = `${base}/search`;
 
     const $ = (id: string) => document.getElementById(id)!;
@@ -145,7 +146,7 @@ const labels = {
       nowTitle.textContent = s.t;
       nowArtist.textContent = s.a;
       const tags = s.g.map((tag) =>
-        `<a class="badge tag" href="${searchBase}?q=tag:${encodeURIComponent(tag)}">${escapeHtml(tag)}</a>`).join("");
+        `<a class="badge tag" href="${searchBase}?q=tag:${encodeURIComponent(tag)}">${escapeHtml(tagLabel(tag, locale))}</a>`).join("");
       const sing = s.s && s.s !== s.a ? `<span class="np-sing">🎤 ${escapeHtml(s.s)}</span>` : "";
       const n = getCount(s.id);
       const plays = n > 0 ? `<span class="np-plays">▶ ${L.plays.replace("%n%", String(n))}</span>` : "";

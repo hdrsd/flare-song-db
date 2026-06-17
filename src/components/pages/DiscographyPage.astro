@@ -39,6 +39,7 @@ const cats = [
     const PAGE = 60;
     const cfg = document.getElementById("cfg")!;
     const base = cfg.dataset.base ?? "";
+    const locale = base === "/ko" ? "ko" : "ja";
     const countTpl = cfg.dataset.count ?? "%n%";
     const watchBase = `${base}/watch`, searchBase = `${base}/search`;
 
@@ -61,7 +62,7 @@ const cats = [
     }
     function more() {
       const slice = filtered.slice(shown, shown + PAGE);
-      grid.insertAdjacentHTML("beforeend", slice.map((s) => renderCard(s, watchBase, searchBase)).join(""));
+      grid.insertAdjacentHTML("beforeend", slice.map((s) => renderCard(s, watchBase, searchBase, locale)).join(""));
       shown += slice.length;
       moreBtn.hidden = shown >= filtered.length;
     }

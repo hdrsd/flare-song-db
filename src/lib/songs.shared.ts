@@ -35,6 +35,20 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
 
+// ── 태그 로케일 라벨 (데이터의 태그는 canonical key, 표시만 로케일별) ──
+const TAG_LABELS: Record<string, { ja: string; ko: string }> = {
+  "歌枠": { ja: "歌枠", ko: "우타와꾸" },
+  "커버": { ja: "カバー", ko: "커버" },
+  "오리지널": { ja: "オリジナル", ko: "오리지널" },
+  "콜라보": { ja: "コラボ", ko: "콜라보" },
+  "유닛": { ja: "ユニット", ko: "유닛" },
+  "홀로전체곡": { ja: "ホロライブ全体曲", ko: "홀로 전체곡" },
+};
+
+export function tagLabel(tag: string, locale: "ja" | "ko"): string {
+  return TAG_LABELS[tag]?.[locale] ?? tag;
+}
+
 // ── 검색 (필드 접두사: title: artist: sing: tag: year: milestone: · 제외 -) ──
 const FIELDS = ["title", "artist", "sing", "tag", "year", "milestone"] as const;
 type Field = (typeof FIELDS)[number];
@@ -90,14 +104,14 @@ export function searchCompact(songs: CompactSong[], query: string): CompactSong[
 }
 
 // ── 카드 HTML (SongCard.astro 와 동일 마크업) ──
-export function renderCard(s: CompactSong, watchBase: string, searchBase: string): string {
+export function renderCard(s: CompactSong, watchBase: string, searchBase: string, locale: "ja" | "ko" = "ja"): string {
   const dur = s.e > s.st ? `<span class="ts">${fmtTime(s.e - s.st)}</span>` : "";
   const watch = `${watchBase}?id=${encodeURIComponent(s.id)}`;
   const tags = s.g
     .slice(0, 3)
     .map(
       (tag) =>
-        `<a class="badge tag" href="${searchBase}?q=tag:${encodeURIComponent(tag)}">${escapeHtml(tag)}</a>`,
+        `<a class="badge tag" href="${searchBase}?q=tag:${encodeURIComponent(tag)}">${escapeHtml(tagLabel(tag, locale))}</a>`,
     )
     .join("");
   return `<article class="card">

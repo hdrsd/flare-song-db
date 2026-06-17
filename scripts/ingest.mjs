@@ -95,7 +95,7 @@ function buildSongs(video, broadcastAt, parsed) {
         end: p.end,
         broadcastAt,
         year,
-        tags: ["歌枠", "커버"],
+        tags: ["歌枠"],
         milestones: [],
       };
     });

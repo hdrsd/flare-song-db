@@ -1,6 +1,10 @@
 ---
 import type { Song } from "@/types/song";
 import { coverUrl, fmtTime, fmtDate } from "@/lib/song";
+import { tagLabel } from "@/lib/songs.shared";
+import { getLocale } from "@/lib/i18n";
+
+const locale = getLocale(Astro.currentLocale);
 
 interface Props {
   song: Song;
@@ -27,7 +31,7 @@ const dur = song.end > song.start ? song.end - song.start : 0;
     <div class="meta">
       <span class="badge date">{fmtDate(song.broadcastAt)}</span>
       {song.tags.slice(0, 3).map((tag) => (
-        <a class="badge tag" href={`${searchBase}?q=tag:${encodeURIComponent(tag)}`}>{tag}</a>
+        <a class="badge tag" href={`${searchBase}?q=tag:${encodeURIComponent(tag)}`}>{tagLabel(tag, locale)}</a>
       ))}
     </div>
   </div>

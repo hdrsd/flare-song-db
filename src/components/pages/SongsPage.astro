@@ -35,11 +35,12 @@ const base = locale === "ko" ? "/ko" : "";
     hidden></div>
 
   <script>
-    import { renderCard, searchCompact, type CompactSong } from "@/lib/songs.shared";
+    import { renderCard, searchCompact, tagLabel, type CompactSong } from "@/lib/songs.shared";
 
     const PAGE = 60;
     const cfg = document.getElementById("cfg")!;
     const base = cfg.dataset.base ?? "";
+    const locale = base === "/ko" ? "ko" : "ja";
     const countTpl = cfg.dataset.count ?? "%n%";
     const allLabel = cfg.dataset.all ?? "All";
     const watchBase = `${base}/watch`;
@@ -80,7 +81,7 @@ const base = locale === "ko" ? "/ko" : "";
 
     function renderMore() {
       const slice = filtered.slice(shown, shown + PAGE);
-      grid.insertAdjacentHTML("beforeend", slice.map((s) => renderCard(s, watchBase, searchBase)).join(""));
+      grid.insertAdjacentHTML("beforeend", slice.map((s) => renderCard(s, watchBase, searchBase, locale)).join(""));
       shown += slice.length;
       moreBtn.hidden = shown >= filtered.length;
     }
@@ -94,9 +95,9 @@ const base = locale === "ko" ? "/ko" : "";
       return a;
     }
 
-    function buildChips(container: HTMLElement, values: string[], get: () => string, set: (v: string) => void) {
+    function buildChips(container: HTMLElement, values: string[], get: () => string, set: (v: string) => void, labelFn?: (v: string) => string) {
       chip(container, "", allLabel, get() === "");
-      for (const v of values) chip(container, v, v, false);
+      for (const v of values) chip(container, v, labelFn ? labelFn(v) : v, false);
       container.addEventListener("click", (e) => {
         const el = (e.target as HTMLElement).closest<HTMLElement>(".chip");
         if (!el) return;
@@ -123,7 +124,7 @@ const base = locale === "ko" ? "/ko" : "";
         for (const s of all) for (const g of s.g) tagCount.set(g, (tagCount.get(g) ?? 0) + 1);
         const tags = [...tagCount.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
         buildChips(yearsEl, years, () => year, (v) => (year = v));
-        buildChips(tagsEl, tags, () => tag, (v) => (tag = v));
+        buildChips(tagsEl, tags, () => tag, (v) => (tag = v), (v) => tagLabel(v, locale));
         applyFilter();
       })
       .catch(() => (countEl.textContent = "데이터를 불러오지 못했습니다."));

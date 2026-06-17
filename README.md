@@ -3,7 +3,7 @@
 시라누이 후레아(不知火フレア / hololive 3rd gen)가 부른 노래를 모아 정리한 **비공식 팬 데이터베이스**.
 노래방송(歌枠)에서 부른 커버, 오리지널 MV, 콜라보·유닛곡을 YouTube 타임스탬프와 함께 검색·재생합니다.
 
-- **사이트**: https://flare-song-db.pages.dev *(배포 후)*
+- **사이트**: https://song.flare.moe
 - 정적 사이트(Astro) · 로컬 JSON 데이터 · ja/ko 다국어 · Cloudflare Pages(트래픽 $0)
 
 > ⚠️ 팬이 운영하는 비공식 사이트입니다. 영상은 YouTube 공식 채널로 임베드/연결만 하며, 홀로라이브 이차창작 가이드라인을 따릅니다.

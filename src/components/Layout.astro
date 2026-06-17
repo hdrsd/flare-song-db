@@ -47,7 +47,8 @@ const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
     <header class="site-header">
       <div class="inner">
         <a class="brand" href={locale === "ko" ? "/ko" : "/"}>🔥 {t("site.name")}</a>
-        <nav class="nav">
+        <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
+        <nav class="nav" id="nav">
           {nav.map((n) => (
             <a href={n.href} class={active === n.key ? "active" : ""}>{n.label}</a>
           ))}
@@ -60,6 +61,11 @@ const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
       </div>
     </header>
     <script is:inline>
+      (() => {
+        const nt = document.getElementById("navToggle");
+        const nav = document.getElementById("nav");
+        if (nt && nav) nt.addEventListener("click", () => nav.classList.toggle("open"));
+      })();
       (() => {
         const btn = document.getElementById("themeToggle");
         if (!btn) return;

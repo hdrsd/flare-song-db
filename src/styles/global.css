@@ -68,6 +68,17 @@ img { display: block; }
 .lang a.active { background: var(--primary); border-color: var(--primary); color: #1a1206; font-weight: 700; }
 .theme-toggle { background: transparent; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font-size: 13px; line-height: 1; padding: 5px 8px; }
 .theme-toggle:hover { border-color: var(--primary); }
+.nav-toggle { display: none; background: transparent; border: 0; color: var(--text); font-size: 20px; line-height: 1; cursor: pointer; padding: 4px 8px; }
+@media (max-width: 700px) {
+  .brand { flex: 1; }
+  .nav-toggle { display: block; order: 5; }
+  .nav {
+    position: absolute; top: 56px; left: 0; right: 0; flex-direction: column; gap: 0; z-index: 19;
+    background: var(--bg); border-bottom: 1px solid var(--border); padding: 6px 0; display: none;
+  }
+  .nav.open { display: flex; }
+  .nav a { padding: 12px 18px; font-size: 15px; }
+}
 
 /* footer */
 .site-footer { border-top: 1px solid var(--border); margin-top: 48px; padding: 24px 0; color: var(--text-dim); font-size: 13px; }

@@ -1,0 +1,104 @@
+---
+import Layout from "@/components/Layout.astro";
+import { getLocale, useT } from "@/lib/i18n";
+
+const locale = getLocale(Astro.currentLocale);
+const t = useT(locale);
+const base = locale === "ko" ? "/ko" : "";
+
+const labels = {
+  total: t("stats.totalSongs"),
+  streams: t("stats.streams"),
+  originals: t("stats.originals"),
+  covers: t("stats.covers"),
+  byYear: t("stats.byYear"),
+  byCategory: t("stats.byCategory"),
+  mostSung: t("stats.mostSung"),
+  times: t("stats.times", { n: "%n%" }),
+  loadFail: locale === "ko" ? "데이터를 불러오지 못했습니다." : "データを読み込めませんでした。",
+};
+---
+
+<Layout title={t("stats.title")} active="statistics">
+  <h1>{t("stats.title")}</h1>
+
+  <div class="stat-cards" id="cards"></div>
+
+  <h2 class="stat-h">{labels.byYear}</h2>
+  <div class="barchart" id="byYear"></div>
+
+  <h2 class="stat-h">{labels.byCategory}</h2>
+  <div class="barchart" id="byCat"></div>
+
+  <h2 class="stat-h">{labels.mostSung}</h2>
+  <div class="barchart" id="mostSung"></div>
+
+  <div id="cfg" data-base={base} data-index={`${base}/songs-index.json`}
+    data-labels={JSON.stringify(labels)} hidden></div>
+
+  <script>
+    import { tagLabel, escapeHtml, type CompactSong } from "@/lib/songs.shared";
+
+    const cfg = document.getElementById("cfg")!;
+    const base = cfg.dataset.base ?? "";
+    const locale = base === "/ko" ? "ko" : "ja";
+    const L = JSON.parse(cfg.dataset.labels!) as Record<string, string>;
+    const fmtN = (n: number) => n.toLocaleString();
+
+    function card(value: string, label: string) {
+      return `<div class="stat-card"><div class="sc-v">${value}</div><div class="sc-l">${escapeHtml(label)}</div></div>`;
+    }
+    function bars(container: HTMLElement, rows: { label: string; n: number; href?: string }[]) {
+      const max = Math.max(1, ...rows.map((r) => r.n));
+      container.innerHTML = rows
+        .map((r) => {
+          const w = Math.round((r.n / max) * 100);
+          const lab = r.href ? `<a href="${r.href}">${escapeHtml(r.label)}</a>` : escapeHtml(r.label);
+          return `<div class="barrow"><div class="bl">${lab}</div>
+            <div class="bt"><div class="bf" style="width:${w}%"></div></div>
+            <div class="bv">${fmtN(r.n)}</div></div>`;
+        })
+        .join("");
+    }
+
+    fetch(cfg.dataset.index!)
+      .then((r) => r.json())
+      .then((all: CompactSong[]) => {
+        const has = (s: CompactSong, tag: string) => s.g.includes(tag);
+        const uta = all.filter((s) => has(s, "歌枠"));
+
+        // 요약 카드
+        const streams = new Set(uta.map((s) => s.v)).size;
+        document.getElementById("cards")!.innerHTML =
+          card(fmtN(all.length), L.total) +
+          card(fmtN(streams), L.streams) +
+          card(fmtN(all.filter((s) => has(s, "오리지널")).length), L.originals) +
+          card(fmtN(all.filter((s) => has(s, "커버")).length), L.covers);
+
+        // 연도별
+        const byYear = new Map<number, number>();
+        for (const s of all) byYear.set(s.y, (byYear.get(s.y) ?? 0) + 1);
+        bars(
+          document.getElementById("byYear")!,
+          [...byYear.entries()].filter(([y]) => y > 0).sort((a, b) => b[0] - a[0]).map(([y, n]) => ({ label: String(y), n })),
+        );
+
+        // 카테고리별
+        const cats = ["歌枠", "오리지널", "커버", "콜라보", "유닛", "홀로전체곡"];
+        bars(
+          document.getElementById("byCat")!,
+          cats.map((c) => ({ label: tagLabel(c, locale), n: all.filter((s) => has(s, c)).length })).filter((r) => r.n > 0),
+        );
+
+        // 많이 부른 곡 (우타와꾸, 제목 기준 집계)
+        const byTitle = new Map<string, number>();
+        for (const s of uta) byTitle.set(s.t, (byTitle.get(s.t) ?? 0) + 1);
+        bars(
+          document.getElementById("mostSung")!,
+          [...byTitle.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20)
+            .map(([title, n]) => ({ label: title, n, href: `${base}/search?q=${encodeURIComponent(title)}` })),
+        );
+      })
+      .catch(() => (document.getElementById("cards")!.textContent = L.loadFail));
+  </script>
+</Layout>

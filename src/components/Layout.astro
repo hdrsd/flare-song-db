@@ -4,7 +4,7 @@ import { getLocale, useT } from "@/lib/i18n";
 
 interface Props {
   title?: string;
-  active?: "home" | "songs" | "search" | "watch" | "playlist" | "discography";
+  active?: "home" | "songs" | "search" | "watch" | "playlist" | "discography" | "statistics";
 }
 const { title, active } = Astro.props;
 const locale = getLocale(Astro.currentLocale);
@@ -22,6 +22,7 @@ const nav = [
   { key: "search", href: (locale === "ko" ? "/ko" : "") + "/search", label: t("nav.search") },
   { key: "watch", href: (locale === "ko" ? "/ko" : "") + "/watch", label: t("nav.watch") },
   { key: "playlist", href: (locale === "ko" ? "/ko" : "") + "/playlist", label: t("nav.playlist") },
+  { key: "statistics", href: (locale === "ko" ? "/ko" : "") + "/statistics", label: t("nav.statistics") },
 ];
 const fullTitle = title ? `${title} | ${t("site.name")}` : t("site.name");
 ---
